@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>实验室回执对单 · 抽样看板</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M9 17.5l4.2 4L23 11' stroke='%23fdfaf3' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">对</span>
+          <div>
+            <h1>实验室回执对单</h1>
+            <p class="brand-sub">早到回执先落库，按工厂与批次核对抽样结论</p>
+          </div>
+        </div>
+        <div class="header-meta">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span id="board-clock">本地演示数据 · 2026-11-20</span>
+        </div>
+      </div>
+      <div class="wrap toolbar" role="toolbar" aria-label="主要操作">
+        <button class="btn btn-primary" id="btn-receive" type="button">
+          <span class="btn-icon" aria-hidden="true">↙</span>接收早到回执
+        </button>
+        <button class="btn btn-danger-ghost" id="btn-revoke" type="button">
+          <span class="btn-icon" aria-hidden="true">⊘</span>撤销一份登记
+        </button>
+        <button class="btn btn-ghost" id="btn-reconcile" type="button">
+          <span class="btn-icon" aria-hidden="true">▦</span>查看抽样对单
+        </button>
+        <span class="toolbar-spacer"></span>
+        <button class="btn btn-link" id="btn-reset" type="button">恢复演示数据</button>
+      </div>
+    </header>
+
+    <div class="wrap page">
+      <section class="stat-strip" id="stat-strip" aria-label="关键计数"></section>
+
+      <section class="case-strip" id="case-strip" aria-label="题设情形核对"></section>
+
+      <nav class="tabs" aria-label="视图">
+        <button class="tab is-active" type="button" data-tab="board">对单看板</button>
+        <button class="tab" type="button" data-tab="reports">回执队列</button>
+        <button class="tab" type="button" data-tab="registrations">采样登记</button>
+        <span class="toolbar-spacer"></span>
+        <label class="filter" for="factory-filter">
+          工厂
+          <select id="factory-filter">
+            <option value="">全部工厂</option>
+          </select>
+        </label>
+      </nav>
+
+      <main
+        id="business-result"
+        class="layout"
+        data-evidence-result="对单看板 / 回执队列 / 采样登记"
+        aria-live="polite"
+      >
+        <div class="content-column">
+          <section class="panel" id="panel-board" data-panel="board">
+            <div class="panel-head">
+              <div>
+                <h2>抽样对单看板</h2>
+                <p class="panel-sub">按工厂 → 批次 → 样本号核对；重复回执不重复计入已对单样本。</p>
+              </div>
+              <span class="stamp" id="reconcile-stamp">—</span>
+            </div>
+            <div id="reconciliation"></div>
+          </section>
+
+          <section class="panel" id="panel-reports" data-panel="reports" hidden>
+            <div class="panel-head">
+              <div>
+                <h2>回执队列</h2>
+                <p class="panel-sub">早到回执保存在此，可保留等待或请求补登记。</p>
+              </div>
+              <span class="pill pill-neutral" id="reports-count">0 份</span>
+            </div>
+            <div id="reports-list" class="table-wrap"></div>
+          </section>
+
+          <section class="panel" id="panel-registrations" data-panel="registrations" hidden>
+            <div class="panel-head">
+              <div>
+                <h2>采样登记</h2>
+                <p class="panel-sub">登记撤销后，与其对单的回执会退回待处理。</p>
+              </div>
+              <button class="btn btn-small btn-outline" id="btn-register" type="button">＋ 登记新样本</button>
+            </div>
+            <div id="registrations-list" class="table-wrap"></div>
+          </section>
+        </div>
+
+        <aside class="evidence-column">
+          <section class="evidence-card" id="evidence-card" aria-label="操作证据">
+            <div class="evidence-head">
+              <span class="evidence-kicker">操作证据</span>
+              <span class="evidence-action" id="evidence-action">—</span>
+            </div>
+            <p class="evidence-summary" id="evidence-summary">正在载入本地演示数据…</p>
+            <div class="evidence-time" id="evidence-time"></div>
+
+            <div class="evidence-section">
+              <h3>计数前后</h3>
+              <div class="counter-diff" id="counter-diff"></div>
+            </div>
+
+            <div class="evidence-section">
+              <h3>状态迁移</h3>
+              <ol class="change-list" id="change-list"></ol>
+            </div>
+
+            <details class="evidence-raw">
+              <summary>原始证据 JSON</summary>
+              <pre id="evidence-json">{}</pre>
+            </details>
+
+            <div class="evidence-section">
+              <h3>本次会话轨迹</h3>
+              <ol class="trail-list" id="trail-list"></ol>
+            </div>
+          </section>
+
+          <section class="hint-card">
+            <h3>对单口径</h3>
+            <ul>
+              <li>同一支样本 = 工厂 + 批次 + 样本号，跨厂同号互不影响。</li>
+              <li>登记建立时会自动认领同键的早到回执。</li>
+              <li>同一支样本的重复回执标为「重复回执」，样本数不增加。</li>
+              <li>撤销登记后，关联回执退回「待处理」，可被重新登记认领。</li>
+            </ul>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <dialog class="modal" id="modal">
+      <form method="dialog" class="modal-form" id="modal-form">
+        <header class="modal-head">
+          <div>
+            <h2 id="modal-title">操作</h2>
+            <p id="modal-sub" class="modal-sub"></p>
+          </div>
+          <button class="icon-btn" type="button" data-close aria-label="关闭">×</button>
+        </header>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="form-error" id="form-error" hidden></div>
+        <footer class="modal-foot">
+          <button class="btn btn-link" type="button" data-close>取消</button>
+          <button class="btn btn-primary" type="submit" id="modal-submit">确认</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <datalist id="factory-options"></datalist>
+
+    <template id="tpl-receive">
+      <div class="field-grid">
+        <label class="field">工厂
+          <input name="factory" list="factory-options" required maxlength="80" value="华东一厂" />
+        </label>
+        <label class="field">批次
+          <input name="batch" required maxlength="80" value="B-2405" />
+        </label>
+        <label class="field">样本号
+          <input name="sampleNo" required maxlength="80" value="S-1005" />
+        </label>
+        <label class="field">检验结论
+          <input name="result" required maxlength="120" value="合格" />
+        </label>
+        <label class="field">收信时间（可选）
+          <input name="receivedAt" type="datetime-local" step="1" />
+        </label>
+        <label class="field">消息编号（可选）
+          <input name="messageId" maxlength="120" placeholder="用于幂等去重，例如 demo-msg-1005" />
+        </label>
+      </div>
+      <p class="modal-note">找不到登记的早到回执会先保存为「待处理」，不计入已对单样本。</p>
+      <div class="quick-picks" id="quick-picks"></div>
+    </template>
+
+    <template id="tpl-revoke">
+      <p class="modal-note" id="revoke-hint"></p>
+      <div class="radio-list" id="revoke-list"></div>
+      <label class="field">撤销原因
+        <input name="reason" required maxlength="300" value="采样登记信息录错，撤销后重录" />
+      </label>
+    </template>
+
+    <template id="tpl-register">
+      <p class="modal-note">登记建立后会自动认领同工厂、同批次、同样本号的早到回执。</p>
+      <div class="field-grid">
+        <label class="field">工厂
+          <input name="factory" list="factory-options" required maxlength="80" value="华东一厂" />
+        </label>
+        <label class="field">批次
+          <input name="batch" required maxlength="80" value="B-2405" />
+        </label>
+        <label class="field">样本号
+          <input name="sampleNo" required maxlength="80" value="S-1005" />
+        </label>
+        <label class="field">采样时间（可选）
+          <input name="registeredAt" type="datetime-local" step="1" />
+        </label>
+      </div>
+      <p class="modal-note" id="register-hint"></p>
+    </template>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
